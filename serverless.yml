@@ -3,13 +3,13 @@ service:
 
 custom:
   pdfTriggerBucket: ${self:service}-${opt:stage, self:provider.stage}-pdf-trigger
+  pdfPagesTriggerBucket: ${self:service}-${opt:stage, self:provider.stage}-pdf-pages-trigger
   imgBucket: ${self:service}-${opt:stage, self:provider.stage}-img
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules:
       forceExclude:
         - aws-sdk
-        - gm
   serverless-iam-roles-per-function:
     defaultInherit: true
   prune:
@@ -30,23 +30,33 @@ provider:
   runtime: nodejs10.x
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'eu-central-1'}
-  memorySize: 512
-  timeout: 600
+  memorySize: 1024
+  timeout: 500
   environment:
     NODE_ENV: ${self:provider.stage}
-  # tracing:
-  #   apiGateway: true
-  #   lambda: true
-  # iamRoleStatements:
-  #   - Effect: Allow
-  #     Action:
-  #       - xray:PutTraceSegments
-  #       - xray:PutTelemetryRecords
-  #     Resource: "*"
 
 functions:
   convert:
-    handler: src/handler.index
+    handler: src/convert.index
+    events:
+      - s3:
+          bucket: ${self:custom.pdfPagesTriggerBucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .pdf
+    environment:
+      IMG_BUCKET: ${self:custom.imgBucket}
+    layers:
+      - { Ref: PopplerLambdaLayer }
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - s3:*
+        Resource:
+          - "arn:aws:s3:::${self:custom.pdfPagesTriggerBucket}/*"
+          - "arn:aws:s3:::${self:custom.imgBucket}/*"
+  split:
+    handler: src/split.index
     events:
       - s3:
           bucket: ${self:custom.pdfTriggerBucket}
@@ -54,10 +64,8 @@ functions:
           rules:
             - suffix: .pdf
     environment:
-      IMG_BUCKET: ${self:custom.imgBucket}
+      PAGES_BUCKET: ${self:custom.pdfPagesTriggerBucket}
     layers:
-      # - arn:aws:lambda:eu-central-1:781361621414:layer:ghostscript:1
-      # - arn:aws:lambda:eu-central-1:781361621414:layer:image-magick:1
       - { Ref: PopplerLambdaLayer }
     iamRoleStatements:
       - Effect: "Allow"
@@ -65,14 +73,10 @@ functions:
           - s3:*
         Resource:
           - "arn:aws:s3:::${self:custom.pdfTriggerBucket}/*"
-          - "arn:aws:s3:::${self:custom.imgBucket}/*"
+          - "arn:aws:s3:::${self:custom.pdfPagesTriggerBucket}/*"
 
 resources:
   Resources:
-    # PdfTriggerBucket:
-    #   Type: AWS::S3::Bucket
-    #   Properties:
-    #     BucketName: ${self:custom.pdfTriggerBucket}
     ImgBucket:
       Type: AWS::S3::Bucket
       Properties:
