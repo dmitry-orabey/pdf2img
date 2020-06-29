@@ -3,8 +3,33 @@ import AWS from "aws-sdk";
 import exec from "await-exec";
 import { S3Handler } from "aws-lambda";
 import path from "path";
+import { createClient } from "node-ses";
 
 const s3 = new AWS.S3();
+const client = createClient({
+  key: process.env.SES_KEY,
+  secret: process.env.SES_SECRET,
+  amazon: `https://email.${process.env.AWS_REGION}.amazonaws.com`,
+});
+
+const sendMail = async (message: string) => {
+  return new Promise((resolve, reject) => {
+    client.sendEmail(
+      {
+        to: process.env.RECEIVER_EMAIL,
+        from: process.env.SENDER_EMAIL,
+        subject: "Pdf to image convertion",
+        message,
+        altText: "plain text",
+      },
+      (err, data) => {
+        if (err) reject(err);
+
+        resolve(data);
+      }
+    );
+  });
+};
 
 const saveToTmp = async (params: AWS.S3.GetObjectRequest) => {
   const data = await s3.getObject(params).promise();
@@ -57,20 +82,28 @@ export const index: S3Handler = async (event) => {
   }
 
   console.log(bucket, srcKey, dstPrefix, fileType);
+  try {
+    await saveToTmp({ Bucket: bucket, Key: srcKey });
 
-  await saveToTmp({ Bucket: bucket, Key: srcKey });
+    const splitted = dstPrefix.split("--separator--");
 
-  const splitted = dstPrefix.split("--separator--");
+    await exec(
+      `mkdir -p /tmp/${
+        splitted[0]
+      } && pdftocairo -jpeg -r 200 -singlefile -cropbox -jpegopt "quality=80" "/tmp/${srcKey}" "/tmp/${splitted.join(
+        "/"
+      )}"`
+    );
 
-  await exec(
-    `mkdir -p /tmp/${
-      splitted[0]
-    } && pdftocairo -jpeg -r 200 -singlefile -cropbox -jpegopt "quality=80" "/tmp/${srcKey}" "/tmp/${splitted.join(
-      "/"
-    )}"`
-  );
+    await saveResult(`/tmp/${splitted[0]}`, splitted[0]);
 
-  await saveResult(`/tmp/${splitted[0]}`, splitted[0]);
+    await deleteObject({ Bucket: bucket, Key: srcKey }, `/tmp/${splitted[0]}`);
 
-  await deleteObject({ Bucket: bucket, Key: srcKey }, `/tmp/${splitted[0]}`);
+    // await sendMail(`Success ${bucket} ${srcKey}`);
+  } catch (error) {
+    console.log(error);
+    sendMail(
+      `Can't convert pdf ${srcKey} to image. Error stack: ${error.stack}`
+    );
+  }
 };

@@ -34,6 +34,10 @@ provider:
   timeout: 500
   environment:
     NODE_ENV: ${self:provider.stage}
+    SES_KEY: <AWS_KEY>
+    SES_SECRET: <AWS_SECRET>
+    SENDER_EMAIL: <my@verified.email>
+    RECEIVER_EMAIL: <my@verified.email>
 
 functions:
   convert:
