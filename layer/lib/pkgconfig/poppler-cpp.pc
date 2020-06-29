@@ -1,0 +1,12 @@
+prefix=/opt
+libdir=/opt/lib
+includedir=/opt/include
+
+Name: poppler-cpp
+Description: cpp backend for Poppler PDF rendering library
+Version: 0.85.0
+Requires: 
+Requires.private: poppler = 0.85.0
+
+Libs: -L${libdir} -lpoppler-cpp
+Cflags: -I${includedir}/poppler/cpp

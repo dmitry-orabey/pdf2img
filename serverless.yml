@@ -1,0 +1,79 @@
+service:
+  name: pdf2img
+
+custom:
+  pdfTriggerBucket: ${self:service}-${opt:stage, self:provider.stage}-pdf-trigger
+  imgBucket: ${self:service}-${opt:stage, self:provider.stage}-img
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+        - gm
+  serverless-iam-roles-per-function:
+    defaultInherit: true
+  prune:
+    automatic: true
+    number: 3
+
+plugins:
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+  - serverless-prune-plugin
+
+layers:
+  poppler:
+    path: layer
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'eu-central-1'}
+  memorySize: 512
+  timeout: 600
+  environment:
+    NODE_ENV: ${self:provider.stage}
+  # tracing:
+  #   apiGateway: true
+  #   lambda: true
+  # iamRoleStatements:
+  #   - Effect: Allow
+  #     Action:
+  #       - xray:PutTraceSegments
+  #       - xray:PutTelemetryRecords
+  #     Resource: "*"
+
+functions:
+  convert:
+    handler: src/handler.index
+    events:
+      - s3:
+          bucket: ${self:custom.pdfTriggerBucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .pdf
+    environment:
+      IMG_BUCKET: ${self:custom.imgBucket}
+    layers:
+      # - arn:aws:lambda:eu-central-1:781361621414:layer:ghostscript:1
+      # - arn:aws:lambda:eu-central-1:781361621414:layer:image-magick:1
+      - { Ref: PopplerLambdaLayer }
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - s3:*
+        Resource:
+          - "arn:aws:s3:::${self:custom.pdfTriggerBucket}/*"
+          - "arn:aws:s3:::${self:custom.imgBucket}/*"
+
+resources:
+  Resources:
+    # PdfTriggerBucket:
+    #   Type: AWS::S3::Bucket
+    #   Properties:
+    #     BucketName: ${self:custom.pdfTriggerBucket}
+    ImgBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.imgBucket}

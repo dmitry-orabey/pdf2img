@@ -1,0 +1,8 @@
+prefix=/opt
+libdir=/opt/lib
+includedir=/opt/include
+
+Name: poppler-splash
+Description: Splash backend for Poppler PDF rendering library
+Version: 0.85.0
+Requires: poppler = 0.85.0
