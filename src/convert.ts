@@ -3,33 +3,9 @@ import AWS from "aws-sdk";
 import exec from "await-exec";
 import { S3Handler } from "aws-lambda";
 import path from "path";
-import { createClient } from "node-ses";
+import { sendMail } from "./email.utils";
 
 const s3 = new AWS.S3();
-const client = createClient({
-  key: process.env.SES_KEY,
-  secret: process.env.SES_SECRET,
-  amazon: `https://email.${process.env.AWS_REGION}.amazonaws.com`,
-});
-
-const sendMail = async (message: string) => {
-  return new Promise((resolve, reject) => {
-    client.sendEmail(
-      {
-        to: process.env.RECEIVER_EMAIL,
-        from: process.env.SENDER_EMAIL,
-        subject: "Pdf to image convertion",
-        message,
-        altText: "plain text",
-      },
-      (err, data) => {
-        if (err) reject(err);
-
-        resolve(data);
-      }
-    );
-  });
-};
 
 const saveToTmp = async (params: AWS.S3.GetObjectRequest) => {
   const data = await s3.getObject(params).promise();
