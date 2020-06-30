@@ -41,6 +41,8 @@ provider:
   timeout: 500
   environment:
     NODE_ENV: ${self:provider.stage}
+    SENDER_EMAIL: <my@verified.email>
+    RECEIVER_EMAIL: <my@verified.email>
 
 functions:
   convert:
@@ -62,6 +64,11 @@ functions:
         Resource:
           - "arn:aws:s3:::${self:custom.pdfPagesTriggerBucket}/*"
           - "arn:aws:s3:::${self:custom.imgBucket}/*"
+      - Effect: Allow
+        Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+        Resource: "*"
   split:
     handler: src/split.index
     events:
@@ -82,6 +89,11 @@ functions:
         Resource:
           - "arn:aws:s3:::${self:custom.pdfTriggerBucket}/*"
           - "arn:aws:s3:::${self:custom.pdfPagesTriggerBucket}/*"
+      - Effect: Allow
+        Action:
+          - ses:SendEmail
+          - ses:SendRawEmail
+        Resource: "*"
 
 resources:
   Resources:

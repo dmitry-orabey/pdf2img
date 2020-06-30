@@ -3,6 +3,7 @@ import AWS from "aws-sdk";
 import exec from "await-exec";
 import { S3Handler } from "aws-lambda";
 import path from "path";
+import { sendMail } from "./email.utils";
 
 const s3 = new AWS.S3();
 
@@ -57,20 +58,28 @@ export const index: S3Handler = async (event) => {
   }
 
   console.log(bucket, srcKey, dstPrefix, fileType);
+  try {
+    await saveToTmp({ Bucket: bucket, Key: srcKey });
 
-  await saveToTmp({ Bucket: bucket, Key: srcKey });
+    const splitted = dstPrefix.split("--separator--");
 
-  const splitted = dstPrefix.split("--separator--");
+    await exec(
+      `mkdir -p /tmp/${
+        splitted[0]
+      } && pdftocairo -jpeg -r 200 -singlefile -cropbox -jpegopt "quality=80" "/tmp/${srcKey}" "/tmp/${splitted.join(
+        "/"
+      )}"`
+    );
 
-  await exec(
-    `mkdir -p /tmp/${
-      splitted[0]
-    } && pdftocairo -jpeg -r 200 -singlefile -cropbox -jpegopt "quality=80" "/tmp/${srcKey}" "/tmp/${splitted.join(
-      "/"
-    )}"`
-  );
+    await saveResult(`/tmp/${splitted[0]}`, splitted[0]);
 
-  await saveResult(`/tmp/${splitted[0]}`, splitted[0]);
+    await deleteObject({ Bucket: bucket, Key: srcKey }, `/tmp/${splitted[0]}`);
 
-  await deleteObject({ Bucket: bucket, Key: srcKey }, `/tmp/${splitted[0]}`);
+    // await sendMail(`Success ${bucket} ${srcKey}`);
+  } catch (error) {
+    console.log(error);
+    sendMail(
+      `Can't convert pdf ${srcKey} to image. Error stack: ${error.stack}`
+    );
+  }
 };

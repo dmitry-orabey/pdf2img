@@ -3,6 +3,7 @@ import AWS from "aws-sdk";
 import exec from "await-exec";
 import { S3Handler } from "aws-lambda";
 import path from "path";
+import { sendMail } from "./email.utils";
 
 const s3 = new AWS.S3();
 
@@ -49,26 +50,31 @@ export const index: S3Handler = async (event) => {
 
   console.log(bucket, srcKey, dstPrefix, fileType);
 
-  await saveToTmp({ Bucket: bucket, Key: srcKey });
+  try {
+    await saveToTmp({ Bucket: bucket, Key: srcKey });
 
-  const result = await exec(`pdfinfo /tmp/${srcKey}`);
+    const result = await exec(`pdfinfo /tmp/${srcKey}`);
 
-  const totalPages = result.stdout.match(/Pages:\s*(.*)\n/)[1];
-  const batch = 50;
-  const pages = [...Array(Math.ceil(totalPages / batch)).keys()];
+    const totalPages = result.stdout.match(/Pages:\s*(.*)\n/)[1];
+    const batch = 50;
+    const pages = [...Array(Math.ceil(totalPages / batch)).keys()];
 
-  for (const page of pages) {
-    let l = (page + 1) * batch;
-    if (l > totalPages) l = totalPages;
-    const res = await exec(
-      `mkdir -p /tmp/${dstPrefix} && pdfseparate -f ${
-        page * batch + 1
-      } -l ${l} /tmp/${srcKey} /tmp/${dstPrefix}/${dstPrefix}--separator--%d.pdf`
-    );
-    console.log(res);
-    await saveResult(`/tmp/${dstPrefix}`);
-    console.log("save result");
-    await exec(`rm -rf /tmp/${dstPrefix}`);
-    console.log("remove");
+    for (const page of pages) {
+      let l = (page + 1) * batch;
+      if (l > totalPages) l = totalPages;
+      const res = await exec(
+        `mkdir -p /tmp/${dstPrefix} && pdfseparate -f ${
+          page * batch + 1
+        } -l ${l} /tmp/${srcKey} /tmp/${dstPrefix}/${dstPrefix}--separator--%d.pdf`
+      );
+      console.log(res);
+      await saveResult(`/tmp/${dstPrefix}`);
+      console.log("save result");
+      await exec(`rm -rf /tmp/${dstPrefix}`);
+      console.log("remove");
+    }
+  } catch (error) {
+    console.log(error);
+    sendMail(`Can't split pdf ${srcKey}. Error stack: ${error.stack}`);
   }
 };
