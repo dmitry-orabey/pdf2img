@@ -15,6 +15,12 @@ custom:
   prune:
     automatic: true
     number: 3
+  profiles:
+    prod: pdf2jpg
+    dev: default
+  regions:
+    prod: ca-central-1
+    dev: eu-central-1
 
 plugins:
   - serverless-webpack
@@ -29,7 +35,8 @@ provider:
   name: aws
   runtime: nodejs10.x
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'eu-central-1'}
+  profile: ${self:custom.profiles.${self:provider.stage}}
+  region: ${opt:region, self:custom.regions.${self:provider.stage}}
   memorySize: 512
   timeout: 500
   environment:
