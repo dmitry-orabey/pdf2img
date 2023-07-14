@@ -23,7 +23,7 @@
     "async": "^3.2.0",
     "await-exec": "^0.1.2",
     "aws-lambda": "^1.0.6",
-    "aws-sdk": "^2.700.0",
+    "aws-sdk": "^2.1415.0",
     "execa": "^4.0.2",
     "pdf-image": "^2.0.0",
     "source-map-support": "^0.5.19",
